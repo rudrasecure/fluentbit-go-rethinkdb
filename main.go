@@ -7,6 +7,7 @@ import (
 	"github.com/fluent/fluent-bit-go/output"
 )
 import (
+	"encoding/json"
 	"log"
 
 	"github.com/rudrasecure/fluentbit-go-rethinkdb/db"
@@ -42,11 +43,13 @@ func FLBPluginInit(plugin unsafe.Pointer) int {
 }
 
 //export FLBPluginFlush
-func FLBPluginFlush(data unsafe.Pointer, length C.int, tag *C.char) int {
+func FLBPluginFlush(ctx, data unsafe.Pointer, length C.int, tag *C.char) int {
 	log.Printf("[%s] Flush called", pluginName)
 
+	logKey := output.FLBPluginConfigKey(ctx, "LogKey")
+
 	decoder := output.NewDecoder(data, int(length))
-	var logRecords []map[any]any
+	var logRecords []map[string]any
 
 	for {
 		ret, _, record := output.GetRecord(decoder)
@@ -54,7 +57,14 @@ func FLBPluginFlush(data unsafe.Pointer, length C.int, tag *C.char) int {
 			break
 		}
 
-		logRecords = append(logRecords, record)
+		logLine := make(map[string]any)
+
+		err := json.Unmarshal(record[logKey].([]uint8), &logLine)
+		if err != nil {
+			log.Printf("[%s] Error unmarshalling log: %s", pluginName, err)
+		}
+
+		logRecords = append(logRecords, logLine)
 	}
 
 	err := r.Insert(logRecords)

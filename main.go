@@ -68,6 +68,10 @@ func FLBPluginFlush(data unsafe.Pointer, length C.int, tag *C.char) int {
 
 //export FLBPluginExit
 func FLBPluginExit() int {
+	err := r.Close()
+	if err != nil {
+		log.Printf("[%s] Error closing connection to RethinkDB: %s", pluginName, err)
+	}
 	return output.FLB_OK
 }
 

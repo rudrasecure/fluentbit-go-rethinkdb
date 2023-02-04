@@ -68,6 +68,6 @@ func (rdb *RethinkDB) Insert(data interface{}) error {
 	return nil
 }
 
-func (rdb *RethinkDB) Close() {
-	rdb.session.Close()
+func (rdb *RethinkDB) Close() error {
+	return rdb.session.Close()
 }

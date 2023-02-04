@@ -1,27 +1,36 @@
 package main
 
 import (
-	"log"
-	"unsafe"
 	"C"
+	"unsafe"
+
 	"github.com/fluent/fluent-bit-go/output"
+)
+import (
+	"log"
+
 	"github.com/rudrasecure/fluentbit-go-rethinkdb/db"
 )
 
-var pluginName string = "fluentbit-go-rethinkdb"
+var pluginName = "fluentbit-go-rethinkdb"
+var r *db.RethinkDB
 
-func FLBPluginRegister(def unsafe.Pointer) int {
-	log.Printf("[%s] Register called", pluginName)
-	return output.FLBPluginRegister(def, pluginName, "An output plugin for Fluent Bit to send data to RethinkDB")
+//export FLBPluginRegister
+func FLBPluginRegister(plugin unsafe.Pointer) int {
+	return output.FLBPluginRegister(plugin, pluginName, "A Fluent Bit Go plugin for RethinkDB.")
 }
 
+//export FLBPluginInit
+// (fluentbit will call this)
+// plugin (context) pointer to fluentbit context (state/ c code)
 func FLBPluginInit(plugin unsafe.Pointer) int {
+	
 	log.Printf("[%s] Init called", pluginName)
 	connectionUri := output.FLBPluginConfigKey(plugin, "ConnectionUri")
 	database := output.FLBPluginConfigKey(plugin, "Database")
 	tableName := output.FLBPluginConfigKey(plugin, "TableName")
 
-	r := &db.RethinkDB{}
+	r = &db.RethinkDB{}
 
 	err := r.Connect(connectionUri, database, tableName)
 	if err != nil {
@@ -29,13 +38,12 @@ func FLBPluginInit(plugin unsafe.Pointer) int {
 		return output.FLB_ERROR
 	}
 
-	output.FLBPluginSetContext(plugin, r)
 	return output.FLB_OK
 }
 
+//export FLBPluginFlush
 func FLBPluginFlush(data unsafe.Pointer, length C.int, tag *C.char) int {
 	log.Printf("[%s] Flush called", pluginName)
-	r := output.FLBPluginGetContext(data).(*db.RethinkDB)
 
 	decoder := output.NewDecoder(data, int(length))
 	var logRecords []map[any]any
@@ -58,11 +66,10 @@ func FLBPluginFlush(data unsafe.Pointer, length C.int, tag *C.char) int {
 	return output.FLB_OK
 }
 
+//export FLBPluginExit
 func FLBPluginExit() int {
-	log.Printf("[%s] [info] exit", pluginName)
 	return output.FLB_OK
 }
 
 func main() {
-
 }

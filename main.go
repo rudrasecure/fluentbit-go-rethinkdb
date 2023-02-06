@@ -42,7 +42,7 @@ func FLBPluginInit(plugin unsafe.Pointer) int {
 	return output.FLB_OK
 }
 
-//export FLBPluginFlush
+//export FLBPluginFlushCtx
 func FLBPluginFlushCtx(ctx, data unsafe.Pointer, length C.int, tag *C.char) int {
 	log.Printf("[%s] Flush called", pluginName)
 	

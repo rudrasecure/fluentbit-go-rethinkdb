@@ -46,8 +46,6 @@ func FLBPluginInit(plugin unsafe.Pointer) int {
 func FLBPluginFlush(ctx, data unsafe.Pointer, length C.int, tag *C.char) int {
 	log.Printf("[%s] Flush called", pluginName)
 
-	logKey := output.FLBPluginConfigKey(ctx, "LogKey")
-
 	decoder := output.NewDecoder(data, int(length))
 	var logRecords []map[string]any
 
@@ -60,6 +58,8 @@ func FLBPluginFlush(ctx, data unsafe.Pointer, length C.int, tag *C.char) int {
 		logLine := make(map[string]any)
 
 		log.Printf("[%s] Record: %s", pluginName, record)
+
+		logKey := output.FLBPluginConfigKey(ctx, "LogKey")
 
 		err := json.Unmarshal(record[logKey].([]uint8), &logLine)
 		if err != nil {

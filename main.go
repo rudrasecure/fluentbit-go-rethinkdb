@@ -43,7 +43,7 @@ func FLBPluginInit(plugin unsafe.Pointer) int {
 }
 
 //export FLBPluginFlush
-func FLBPluginFlush(ctx, data unsafe.Pointer, length C.int, tag *C.char) int {
+func FLBPluginFlushCtx(ctx, data unsafe.Pointer, length C.int, tag *C.char) int {
 	log.Printf("[%s] Flush called", pluginName)
 	
 	log.Printf("[%s] Data: %s", pluginName, data)

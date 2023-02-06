@@ -30,6 +30,7 @@ func FLBPluginInit(plugin unsafe.Pointer) int {
 	connectionUri := output.FLBPluginConfigKey(plugin, "ConnectionUri")
 	database := output.FLBPluginConfigKey(plugin, "Database")
 	tableName := output.FLBPluginConfigKey(plugin, "TableName")
+	logKey := output.FLBPluginConfigKey(plugin, "LogKey")
 
 	r = &db.RethinkDB{}
 
@@ -39,13 +40,13 @@ func FLBPluginInit(plugin unsafe.Pointer) int {
 		return output.FLB_ERROR
 	}
 
+	output.FLBPluginSetContext(plugin, logKey)
+
 	return output.FLB_OK
 }
 
-//export FLBPluginFlush
-func FLBPluginFlush(ctx, data unsafe.Pointer, length C.int, tag *C.char) int {
-	log.Printf("[%s] Flush called", pluginName)
-
+//export FLBPluginFlushCtx
+func FLBPluginFlushCtx(ctx, data unsafe.Pointer, length C.int, tag *C.char) int {
 	decoder := output.NewDecoder(data, int(length))
 	var logRecords []map[string]any
 
@@ -57,13 +58,24 @@ func FLBPluginFlush(ctx, data unsafe.Pointer, length C.int, tag *C.char) int {
 
 		logLine := make(map[string]any)
 
-		log.Printf("[%s] Record: %s", pluginName, record)
+		logKey := output.FLBPluginGetContext(ctx).(string)
 
-		logKey := output.FLBPluginConfigKey(ctx, "LogKey")
+		switch record[logKey].(type) {
+			case string:
+				err := json.Unmarshal([]byte(record[logKey].(string)), &logLine)
+				if err != nil {
+					log.Printf("[%s] Error unmarshalling log: %s", pluginName, err)
+				}
 
-		err := json.Unmarshal(record[logKey].([]uint8), &logLine)
-		if err != nil {
-			log.Printf("[%s] Error unmarshalling log: %s", pluginName, err)
+			case []uint8:
+				err := json.Unmarshal(record[logKey].([]uint8), &logLine)
+				if err != nil {
+					log.Printf("[%s] Error unmarshalling log: %s", pluginName, err)
+				}
+
+			default:
+				logLine = record[logKey].(map[string]any)
+
 		}
 
 		logRecords = append(logRecords, logLine)
@@ -72,7 +84,7 @@ func FLBPluginFlush(ctx, data unsafe.Pointer, length C.int, tag *C.char) int {
 	err := r.Insert(logRecords)
 	if err != nil {
 		log.Printf("[%s] Error inserting data to RethinkDB: %s", pluginName, err)
-		return output.FLB_ERROR
+		return output.FLB_RETRY
 	}
 
 	return output.FLB_OK

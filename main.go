@@ -59,6 +59,8 @@ func FLBPluginFlush(ctx, data unsafe.Pointer, length C.int, tag *C.char) int {
 
 		logLine := make(map[string]any)
 
+		log.Printf("[%s] Record: %s", pluginName, record)
+
 		err := json.Unmarshal(record[logKey].([]uint8), &logLine)
 		if err != nil {
 			log.Printf("[%s] Error unmarshalling log: %s", pluginName, err)

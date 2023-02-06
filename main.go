@@ -63,9 +63,18 @@ func FLBPluginFlushCtx(ctx, data unsafe.Pointer, length C.int, tag *C.char) int 
 
 		logKey := output.FLBPluginConfigKey(ctx, "LogKey")
 
-		err := json.Unmarshal(record[logKey].([]uint8), &logLine)
-		if err != nil {
-			log.Printf("[%s] Error unmarshalling log: %s", pluginName, err)
+		switch record[logKey].(type) {
+			case string:
+				err := json.Unmarshal([]byte(record[logKey].(string)), &logLine)
+				if err != nil {
+					log.Printf("[%s] Error unmarshalling log: %s", pluginName, err)
+				}
+
+			case []uint8:
+				err := json.Unmarshal(record[logKey].([]uint8), &logLine)
+				if err != nil {
+					log.Printf("[%s] Error unmarshalling log: %s", pluginName, err)
+				}
 		}
 
 		logRecords = append(logRecords, logLine)
@@ -74,7 +83,7 @@ func FLBPluginFlushCtx(ctx, data unsafe.Pointer, length C.int, tag *C.char) int 
 	err := r.Insert(logRecords)
 	if err != nil {
 		log.Printf("[%s] Error inserting data to RethinkDB: %s", pluginName, err)
-		return output.FLB_ERROR
+		return output.FLB_RETRY
 	}
 
 	return output.FLB_OK

@@ -30,6 +30,7 @@ func FLBPluginInit(plugin unsafe.Pointer) int {
 	connectionUri := output.FLBPluginConfigKey(plugin, "ConnectionUri")
 	database := output.FLBPluginConfigKey(plugin, "Database")
 	tableName := output.FLBPluginConfigKey(plugin, "TableName")
+	logKey := output.FLBPluginConfigKey(plugin, "LogKey")
 
 	r = &db.RethinkDB{}
 
@@ -39,15 +40,13 @@ func FLBPluginInit(plugin unsafe.Pointer) int {
 		return output.FLB_ERROR
 	}
 
+	output.FLBPluginSetContext(plugin, logKey)
+
 	return output.FLB_OK
 }
 
 //export FLBPluginFlushCtx
 func FLBPluginFlushCtx(ctx, data unsafe.Pointer, length C.int, tag *C.char) int {
-	log.Printf("[%s] Flush called", pluginName)
-	
-	log.Printf("[%s] Data: %s", pluginName, data)
-	log.Printf("[%s] Length: %d", pluginName, length)
 	decoder := output.NewDecoder(data, int(length))
 	var logRecords []map[string]any
 
@@ -59,9 +58,7 @@ func FLBPluginFlushCtx(ctx, data unsafe.Pointer, length C.int, tag *C.char) int 
 
 		logLine := make(map[string]any)
 
-		log.Printf("[%s] Record: %s", pluginName, record)
-
-		logKey := output.FLBPluginConfigKey(ctx, "LogKey")
+		logKey := output.FLBPluginGetContext(ctx).(string)
 
 		log.Printf("[%s] LogKey: %s", pluginName, logKey)
 

@@ -45,7 +45,9 @@ func FLBPluginInit(plugin unsafe.Pointer) int {
 //export FLBPluginFlush
 func FLBPluginFlush(ctx, data unsafe.Pointer, length C.int, tag *C.char) int {
 	log.Printf("[%s] Flush called", pluginName)
-
+	
+	log.Printf("[%s] Data: %s", pluginName, data)
+	log.Printf("[%s] Length: %d", pluginName, length)
 	decoder := output.NewDecoder(data, int(length))
 	var logRecords []map[string]any
 

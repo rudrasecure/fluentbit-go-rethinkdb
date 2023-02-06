@@ -63,6 +63,8 @@ func FLBPluginFlushCtx(ctx, data unsafe.Pointer, length C.int, tag *C.char) int 
 
 		logKey := output.FLBPluginConfigKey(ctx, "LogKey")
 
+		log.Printf("[%s] LogKey: %s", pluginName, logKey)
+
 		switch record[logKey].(type) {
 			case string:
 				err := json.Unmarshal([]byte(record[logKey].(string)), &logLine)

@@ -27,6 +27,12 @@ func FLBPluginInit(plugin unsafe.Pointer) int {
 	
 	log.Printf("[%s] Init called", pluginName)
 	connectionUri := output.FLBPluginConfigKey(plugin, "ConnectionUri")
+
+	if connectionUri == "" {
+		log.Printf("[%s] ConnectionUri is required", pluginName)
+		return output.FLB_ERROR
+	}
+
 	database := output.FLBPluginConfigKey(plugin, "Database")
 	tableName := output.FLBPluginConfigKey(plugin, "TableName")
 	logKey := output.FLBPluginConfigKey(plugin, "LogKey")

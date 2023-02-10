@@ -9,7 +9,7 @@ type RethinkDB struct{
 	tableName string
 }
 
-func (rdb *RethinkDB) Connect(connectionUri string, database string, tableName string) error {
+func (rdb *RethinkDB) Connect(connectionUri string, database string, tableName string, primaryKey string) error {
 	session, err := r.Connect(r.ConnectOpts {
 		Address:  connectionUri,
 		Database: database,
@@ -48,7 +48,9 @@ func (rdb *RethinkDB) Connect(connectionUri string, database string, tableName s
 	}
 
 	if !exists {
-		_, err = r.DB(database).TableCreate(tableName).RunWrite(session)
+		_, err = r.DB(database).TableCreate(tableName, r.TableCreateOpts{
+			PrimaryKey: primaryKey,
+		}).RunWrite(session)
 		if err != nil {
 			return err
 		}

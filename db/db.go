@@ -7,10 +7,9 @@ import (
 type RethinkDB struct{
 	session *r.Session
 	tableName string
-	primaryKey *string
 }
 
-func (rdb *RethinkDB) Connect(connectionUri string, database string, tableName string, primaryKey *string) error {
+func (rdb *RethinkDB) Connect(connectionUri string, database string, tableName string, primaryKey string) error {
 	session, err := r.Connect(r.ConnectOpts {
 		Address:  connectionUri,
 		Database: database,

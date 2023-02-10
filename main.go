@@ -32,9 +32,25 @@ func FLBPluginInit(plugin unsafe.Pointer) int {
 	logKey := output.FLBPluginConfigKey(plugin, "LogKey")
 	primaryKey := output.FLBPluginConfigKey(plugin, "PrimaryKey")
 
+	if primaryKey == "" {
+		primaryKey = "id"
+	}
+
+	if logKey == "" {
+		logKey = "log"
+	}
+
+	if database == "" {
+		database = "test"
+	}
+
+	if tableName == "" {
+		tableName = "logs"
+	}
+
 	r := &db.RethinkDB{}
 
-	err := r.Connect(connectionUri, database, tableName, &primaryKey)
+	err := r.Connect(connectionUri, database, tableName, primaryKey)
 	if err != nil {
 		log.Printf("[%s] Error connecting to RethinkDB: %s", pluginName, err)
 		return output.FLB_ERROR

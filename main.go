@@ -14,7 +14,6 @@ import (
 )
 
 var pluginName = "fluentbit-go-rethinkdb"
-var r *db.RethinkDB
 
 //export FLBPluginRegister
 func FLBPluginRegister(plugin unsafe.Pointer) int {
@@ -32,7 +31,7 @@ func FLBPluginInit(plugin unsafe.Pointer) int {
 	tableName := output.FLBPluginConfigKey(plugin, "TableName")
 	logKey := output.FLBPluginConfigKey(plugin, "LogKey")
 
-	r = &db.RethinkDB{}
+	r := &db.RethinkDB{}
 
 	err := r.Connect(connectionUri, database, tableName)
 	if err != nil {
@@ -40,7 +39,10 @@ func FLBPluginInit(plugin unsafe.Pointer) int {
 		return output.FLB_ERROR
 	}
 
-	output.FLBPluginSetContext(plugin, logKey)
+	output.FLBPluginSetContext(plugin, map[string]any {
+		"rethink": r,
+		"logKey": logKey,
+	})
 
 	return output.FLB_OK
 }
@@ -49,6 +51,8 @@ func FLBPluginInit(plugin unsafe.Pointer) int {
 func FLBPluginFlushCtx(ctx, data unsafe.Pointer, length C.int, tag *C.char) int {
 	decoder := output.NewDecoder(data, int(length))
 	var logRecords []map[string]any
+	ctxData := output.FLBPluginGetContext(ctx).(map[string]any)
+	r := ctxData["rethink"].(*db.RethinkDB)
 
 	for {
 		ret, _, record := output.GetRecord(decoder)
@@ -58,7 +62,7 @@ func FLBPluginFlushCtx(ctx, data unsafe.Pointer, length C.int, tag *C.char) int 
 
 		logLine := make(map[string]any)
 
-		logKey := output.FLBPluginGetContext(ctx).(string)
+		logKey := ctxData["logKey"].(string)
 
 		switch record[logKey].(type) {
 			case string:
@@ -90,8 +94,10 @@ func FLBPluginFlushCtx(ctx, data unsafe.Pointer, length C.int, tag *C.char) int 
 	return output.FLB_OK
 }
 
-//export FLBPluginExit
-func FLBPluginExit() int {
+//export FLBPluginExitCtx
+func FLBPluginExitCtx(ctx unsafe.Pointer) int {
+	ctxData := output.FLBPluginGetContext(ctx).(map[string]any)
+	r := ctxData["rethink"].(*db.RethinkDB)
 	err := r.Close()
 	if err != nil {
 		log.Printf("[%s] Error closing connection to RethinkDB: %s", pluginName, err)

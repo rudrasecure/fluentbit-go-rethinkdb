@@ -9,6 +9,7 @@ import (
 import (
 	"encoding/json"
 	"log"
+	"time"
 
 	"github.com/rudrasecure/fluentbit-go-rethinkdb/db"
 )
@@ -35,15 +36,10 @@ func FLBPluginInit(plugin unsafe.Pointer) int {
 
 	database := output.FLBPluginConfigKey(plugin, "Database")
 	tableName := output.FLBPluginConfigKey(plugin, "TableName")
-	logKey := output.FLBPluginConfigKey(plugin, "LogKey")
 	primaryKey := output.FLBPluginConfigKey(plugin, "PrimaryKey")
 
 	if primaryKey == "" {
 		primaryKey = "id"
-	}
-
-	if logKey == "" {
-		logKey = "log"
 	}
 
 	if database == "" {
@@ -62,10 +58,7 @@ func FLBPluginInit(plugin unsafe.Pointer) int {
 		return output.FLB_ERROR
 	}
 
-	output.FLBPluginSetContext(plugin, map[string]any {
-		"rethink": r,
-		"logKey": logKey,
-	})
+	output.FLBPluginSetContext(plugin, r)
 
 	return output.FLB_OK
 }
@@ -74,36 +67,26 @@ func FLBPluginInit(plugin unsafe.Pointer) int {
 func FLBPluginFlushCtx(ctx, data unsafe.Pointer, length C.int, tag *C.char) int {
 	decoder := output.NewDecoder(data, int(length))
 	var logRecords []map[string]any
-	ctxData := output.FLBPluginGetContext(ctx).(map[string]any)
-	r := ctxData["rethink"].(*db.RethinkDB)
+	r := output.FLBPluginGetContext(ctx).(*db.RethinkDB)
 
 	for {
-		ret, _, record := output.GetRecord(decoder)
+		ret, ts, record := output.GetRecord(decoder)
 		if ret != 0 {
 			break
 		}
 
-		logLine := make(map[string]any)
-
-		logKey := ctxData["logKey"].(string)
-
-		switch record[logKey].(type) {
-			case string:
-				err := json.Unmarshal([]byte(record[logKey].(string)), &logLine)
-				if err != nil {
-					log.Printf("[%s] Error unmarshalling log: %s", pluginName, err)
-				}
-
-			case []uint8:
-				err := json.Unmarshal(record[logKey].([]uint8), &logLine)
-				if err != nil {
-					log.Printf("[%s] Error unmarshalling log: %s", pluginName, err)
-				}
-
-			default:
-				logLine = record[logKey].(map[string]any)
-
+		var timeStamp time.Time
+		switch t := ts.(type) {
+		case output.FLBTime:
+			timeStamp = ts.(output.FLBTime).Time
+		case uint64:
+			timeStamp = time.Unix(int64(t), 0)
+		default:
+			log.Print("given time is not in a known format, defaulting to now.\n")
+			timeStamp = time.Now()
 		}
+
+		logLine := createJSON(&timeStamp, record)
 
 		logRecords = append(logRecords, logLine)
 	}
@@ -119,13 +102,41 @@ func FLBPluginFlushCtx(ctx, data unsafe.Pointer, length C.int, tag *C.char) int 
 
 //export FLBPluginExitCtx
 func FLBPluginExitCtx(ctx unsafe.Pointer) int {
-	ctxData := output.FLBPluginGetContext(ctx).(map[string]any)
-	r := ctxData["rethink"].(*db.RethinkDB)
+	r := output.FLBPluginGetContext(ctx).(*db.RethinkDB)
 	err := r.Close()
 	if err != nil {
 		log.Printf("[%s] Error closing connection to RethinkDB: %s", pluginName, err)
 	}
 	return output.FLB_OK
+}
+
+func parseMap(timestamp *time.Time, mapInterface map[interface{}]interface{}) map[string]interface{} {
+	m := make(map[string]interface{})
+	
+	for k, v := range mapInterface {
+		switch t := v.(type) {
+		case []byte:
+			var data map[string]interface{}
+			err := json.Unmarshal(t, &data)
+			if err != nil {
+				m[k.(string)] = string(t)
+				continue
+			}
+			m[k.(string)] = data
+		case map[interface{}]interface{}:
+			m[k.(string)] = parseMap(nil, t)
+		default:
+			m[k.(string)] = v
+		}
+	}
+
+	m["fluentbit_timestamp"] = timestamp
+	return m
+}
+
+func createJSON(timestamp *time.Time, record map[interface{}]interface{}) map[string]interface{} {
+	m := parseMap(timestamp, record)
+	return m
 }
 
 func main() {

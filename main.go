@@ -65,6 +65,7 @@ func FLBPluginInit(plugin unsafe.Pointer) int {
 
 //export FLBPluginFlushCtx
 func FLBPluginFlushCtx(ctx, data unsafe.Pointer, length C.int, tag *C.char) int {
+	defer handlePanic()
 	decoder := output.NewDecoder(data, int(length))
 	var logRecords []map[string]any
 	r := output.FLBPluginGetContext(ctx).(*db.RethinkDB)
@@ -134,10 +135,17 @@ func parseMap(timestamp *time.Time, mapInterface map[interface{}]interface{}) ma
 	return m
 }
 
+func handlePanic() {
+	if r := recover(); r != nil {
+		log.Printf("[%s] Recovered from panic: %s", pluginName, r)
+	}
+}
+
 func createJSON(timestamp *time.Time, record map[interface{}]interface{}) map[string]interface{} {
 	m := parseMap(timestamp, record)
 	return m
 }
 
 func main() {
+
 }

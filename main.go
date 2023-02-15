@@ -76,6 +76,8 @@ func FLBPluginFlushCtx(ctx, data unsafe.Pointer, length C.int, tag *C.char) int 
 			break
 		}
 
+		log.Printf("Record: %v", record)
+
 		var timeStamp time.Time
 		switch t := ts.(type) {
 		case output.FLBTime:

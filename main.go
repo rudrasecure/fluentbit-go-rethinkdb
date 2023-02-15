@@ -102,10 +102,14 @@ func FLBPluginFlushCtx(ctx, data unsafe.Pointer, length C.int, tag *C.char) int 
 
 //export FLBPluginExitCtx
 func FLBPluginExitCtx(ctx unsafe.Pointer) int {
-	r := output.FLBPluginGetContext(ctx).(*db.RethinkDB)
-	err := r.Close()
-	if err != nil {
-		log.Printf("[%s] Error closing connection to RethinkDB: %s", pluginName, err)
+	log.Printf("[%v] Exit called", ctx)
+	r, ok := output.FLBPluginGetContext(ctx).(*db.RethinkDB)
+	if ok {
+		err := r.Close()
+		if err != nil {
+			log.Printf("[%s] Error closing connection to RethinkDB: %s", pluginName, err)
+			return output.FLB_ERROR
+		}
 	}
 	return output.FLB_OK
 }
@@ -139,5 +143,12 @@ func createJSON(timestamp *time.Time, record map[interface{}]interface{}) map[st
 	return m
 }
 
+func handlePanic() {
+	if r := recover(); r != nil {
+		log.Printf("[%s] Recovered in f %v", pluginName, r)
+	}
+}
+
 func main() {
+	defer handlePanic()
 }

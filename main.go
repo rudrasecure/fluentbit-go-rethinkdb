@@ -21,11 +21,12 @@ func FLBPluginRegister(plugin unsafe.Pointer) int {
 	return output.FLBPluginRegister(plugin, pluginName, "A Fluent Bit Go plugin for RethinkDB.")
 }
 
-//export FLBPluginInit
 // (fluentbit will call this)
 // plugin (context) pointer to fluentbit context (state/ c code)
+//
+//export FLBPluginInit
 func FLBPluginInit(plugin unsafe.Pointer) int {
-	
+
 	log.Printf("[%s] Init called", pluginName)
 	connectionUri := output.FLBPluginConfigKey(plugin, "ConnectionUri")
 
@@ -86,7 +87,9 @@ func FLBPluginFlushCtx(ctx, data unsafe.Pointer, length C.int, tag *C.char) int 
 			timeStamp = time.Now()
 		}
 
-		logLine := createJSON(&timeStamp, record)
+		record["fluentbit_timestamp"] = timeStamp.UTC().Format(time.RFC3339)
+
+		logLine := createJSON(record)
 
 		logRecords = append(logRecords, logLine)
 	}
@@ -114,32 +117,39 @@ func FLBPluginExitCtx(ctx unsafe.Pointer) int {
 	return output.FLB_OK
 }
 
-func parseMap(timestamp *time.Time, mapInterface map[interface{}]interface{}) map[string]interface{} {
-	m := make(map[string]interface{})
-	
-	for k, v := range mapInterface {
-		switch t := v.(type) {
-		case []byte:
-			var data map[string]interface{}
-			err := json.Unmarshal(t, &data)
-			if err != nil {
-				m[k.(string)] = string(t)
-				continue
-			}
-			m[k.(string)] = data
-		case map[interface{}]interface{}:
-			m[k.(string)] = parseMap(nil, t)
-		default:
-			m[k.(string)] = v
+func parseValue(v interface{}) any {
+	switch t := v.(type) {
+	case []byte:
+		var data map[string]interface{}
+		err := json.Unmarshal(t, &data)
+		if err != nil {
+			return string(t)
 		}
+		return data
+	case map[interface{}]interface{}:
+		dataRemapped := make(map[string]interface{})
+		for k, v := range t {
+			dataRemapped[k.(string)] = parseValue(v)
+		}
+		return dataRemapped
+	case []interface{}:
+		dataRemapped := make([]interface{}, len(t))
+		for i, v := range t {
+			dataRemapped[i] = parseValue(v)
+		}
+		return dataRemapped
+	default:
+		return t
 	}
-
-	m["fluentbit_timestamp"] = timestamp
-	return m
 }
 
-func createJSON(timestamp *time.Time, record map[interface{}]interface{}) map[string]interface{} {
-	m := parseMap(timestamp, record)
+func createJSON(record map[interface{}]interface{}) map[string]interface{} {
+	m := make(map[string]interface{})
+
+	for k, v := range record {
+		m[k.(string)] = parseValue(v)
+	}
+
 	return m
 }
 

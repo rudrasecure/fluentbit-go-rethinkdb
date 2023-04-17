@@ -63,10 +63,12 @@ func (rdb *RethinkDB) Connect(connectionUri string, database string, tableName s
 }
 
 func (rdb *RethinkDB) Insert(data interface{}) error {
-	_, err := r.Table(rdb.tableName).Insert(data).RunWrite(rdb.session)
+	_, err := r.Table(rdb.tableName).Insert(data).RunWrite(rdb.session, r.RunOpts{
+		Durability: "hard",
+	})
 	if err != nil {
 		return err
-	} 
+	}
 	return nil
 }
 
